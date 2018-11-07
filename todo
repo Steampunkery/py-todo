@@ -262,6 +262,105 @@ def print_version():
           "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE")
 
 
+# Handler functions
+#########################################
+def add():
+    try:
+        title, exp_date_str = take_input(2, 3)
+
+        exp_date = parse_date_str(exp_date_str)
+        add_item(title, exp_date)
+        list_items()
+    except KeyboardInterrupt:
+        # If the input is canceled, print a newline for prettiness, list the items and exit
+        print()
+        list_items()
+        sys.exit()
+
+
+def remove():
+    if len(sys.argv) >= 3:
+        try:
+            indices = list(map(int, sys.argv[2:]))
+            remove_item(indices)
+            list_items()
+        except:
+            print("Item does not exist.")
+    else:
+        print_usage()
+
+
+def edit():
+    if len(sys.argv) >= 3:
+        try:
+            item = items[int(sys.argv[2])]
+            title, exp_date_str = take_input(3, 4, default_title=item.title)
+
+            item.title = title
+            item.exp_date = parse_date_str(exp_date_str)
+            list_items()
+        except IndexError:
+            print("Item does not exist.")
+            sys.exit()
+        except KeyboardInterrupt:
+            # If the input is canceled, print a newline for prettiness, list the items and exit
+            # We don't need to re-add the old item here because if input is canceled, we never actually changed it
+            print()
+            list_items()
+            sys.exit()
+    else:
+        print_usage()
+
+
+def move():
+    if len(sys.argv) == 4:
+        try:
+            to_move = items[int(sys.argv[2])]
+            remove_item([int(sys.argv[2])])
+            insert_todo_item(int(sys.argv[3]), to_move)
+        except (IndexError, ValueError):
+            print("Item does not exist.")
+            sys.exit()
+
+        list_items()
+
+    else:
+        print_usage()
+
+
+def orgfile():
+    if len(sys.argv) == 2:
+        keywords = []
+        filename = str(sys.argv[2])
+        # Open the orgfile
+        with open(filename, 'r') as f:
+            content = f.readlines()
+
+        for index, line in enumerate(content):
+            # Search for the header to obtain the keywords
+            if "#+TODO:" in line:
+                keywords.extend(scrape_keywords(line))
+            else:
+                if not keywords:
+                    keywords.append('TODO')
+                    keywords.append('DONE')
+                for word in keywords:
+                    # Search in each line and format if match
+                    if word in line and '*' in line:
+                        title = strip_line(line, word)
+                        try:
+                            if ': <' in content[index + 1]:
+                                add_item(title, scrape_date(content[index + 1]))
+                            else:
+                                add_item(title, None)
+                        except IndexError:
+                            add_item(title, None)
+        list_items()
+
+    else:
+        print_usage()
+#########################################
+
 
 if __name__ == '__main__':
     # mkdir -p on config_location and datafile_location.
@@ -293,92 +392,19 @@ if __name__ == '__main__':
         list_items()
 
     elif sys.argv[1] == '-a' or sys.argv[1] == '--add':
-        try:
-            title, exp_date_str = take_input(2, 3)
-
-            exp_date = parse_date_str(exp_date_str)
-            add_item(title, exp_date)
-            list_items()
-        except KeyboardInterrupt:
-            # If the input is canceled, print a newline for prettiness, list the items and exit
-            print()
-            list_items()
-            sys.exit()
+        add()
 
     elif sys.argv[1] == '-r' or sys.argv[1] == '--remove':
-        if len(sys.argv) >= 3:
-            try:
-                indices = list(map(int, sys.argv[2:]))
-                remove_item(indices)
-                list_items()
-            except:
-                print("Item does not exist.")
-        else:
-            print_usage()
+        remove()
 
     elif sys.argv[1] == '-e' or sys.argv[1] == '--edit':
-        if len(sys.argv) >= 3:
-            try:
-                item = items[int(sys.argv[2])]
-                title, exp_date_str = take_input(3, 4, default_title=item.title)
-
-                item.title = title
-                item.exp_date = parse_date_str(exp_date_str)
-                list_items()
-            except IndexError:
-                print("Item does not exist.")
-                sys.exit()
-            except KeyboardInterrupt:
-                # If the input is canceled, print a newline for prettiness, list the items and exit
-                # We don't need to re-add the old item here because if input is canceled, we never actually changed it
-                print()
-                list_items()
-                sys.exit()
-        else:
-            print_usage()
+        edit()
 
     elif sys.argv[1] == "-m" or sys.argv[1] == "--move":
-        if len(sys.argv) == 4:
-            try:
-                to_move = items[int(sys.argv[2])]
-                remove_item([int(sys.argv[2])])
-                insert_todo_item(int(sys.argv[3]), to_move)
-            except (IndexError, ValueError):
-                print("Item does not exist.")
-                sys.exit()
-
-            list_items()
-
-        else:
-            print_usage()
+        move()
 
     elif sys.argv[1] == '-org' or sys.argv[1] == '--orgfile':
-        keywords = []
-        filename = str(sys.argv[2])
-        # Open the orgfile
-        with open(filename, 'r') as f:
-            content = f.readlines()
-
-        for index, line in enumerate(content):
-            # Search for the header to obtain the keywords
-            if "#+TODO:" in line:
-                keywords.extend(scrape_keywords(line))
-            else:
-                if not keywords:
-                    keywords.append('TODO')
-                    keywords.append('DONE')
-                for word in keywords:
-                    # Search in each line and format if match
-                    if word in line and '*' in line:
-                        title = strip_line(line, word)
-                        try:
-                            if ': <' in content[index + 1]:
-                                add_item(title, scrape_date(content[index + 1]))
-                            else:
-                                add_item(title, None)
-                        except IndexError:
-                            add_item(title, None)
-        list_items()
+        orgfile()
 
     elif sys.argv[1] == '-v' or sys.argv[1] == '--version':
         print_version()
