@@ -27,11 +27,13 @@ today_color = '\x1b[33m{}\x1b[0m'
 """ Regex for removing terminal escape sequences from a string """
 esc_seq_reg = re.compile(r'\x1b[^m]*m')
 
+
 class Weekday(IntEnum):
     """ Define Weekday constants """
     MONDAY = 0
     SATURDAY = 5
     SUNDAY = 6
+
 
 """ List of TodoItems, to be stored later in the datafile """
 items = []
@@ -41,6 +43,9 @@ config = {
     'color': 'false',
     'detail_mode': 'false',
 }
+
+""" Dictionary of triggers to handler functions """
+handlers = {}
 
 
 class TodoItem:
@@ -178,7 +183,7 @@ def parse_date_str(exp_date_str):
             return datetime.today() + timedelta(days=day_count)
         else:
             return datetime(*map(int, exp_date_str.split('/')))
-    except:
+    except ValueError:
         print("An error occurred while parsing your date.")
         sys.exit()
 
@@ -284,7 +289,7 @@ def remove():
             indices = list(map(int, sys.argv[2:]))
             remove_item(indices)
             list_items()
-        except:
+        except IndexError:
             print("Item does not exist.")
     else:
         print_usage()
@@ -313,6 +318,7 @@ def edit():
 
 
 def move():
+    """ Moves a given item to the gi """
     if len(sys.argv) == 4:
         try:
             to_move = items[int(sys.argv[2])]
@@ -328,11 +334,12 @@ def move():
         print_usage()
 
 
-def orgfile():
+def org_file():
+    """ Adds TodoItems to the list from an emacs org-file """
     if len(sys.argv) == 2:
         keywords = []
         filename = str(sys.argv[2])
-        # Open the orgfile
+        # Open the org file
         with open(filename, 'r') as f:
             content = f.readlines()
 
@@ -362,6 +369,17 @@ def orgfile():
 #########################################
 
 
+def register_handler(triggers, func):
+    """Registers a handler
+    Adds a key-value pair where the key is a tuple of triggers (possible values of sys.argv[1])
+    and the value is the handler function to be executed if any of the triggers match sys.argv[1]
+
+    :param triggers: The values of sys.argv[1] that cause func to run
+    :param func: The handler function to be run if sys.argv[1] is in triggers
+    """
+    handlers[triggers] = func
+
+
 if __name__ == '__main__':
     # mkdir -p on config_location and datafile_location.
     Path(config_location).mkdir(parents=True, exist_ok=True)
@@ -381,33 +399,25 @@ if __name__ == '__main__':
     try:
         with open(datafile_location + datafile_name, 'rb') as f:
             items = pickle.load(f)
-    except:
+    except FileNotFoundError:
         pass
+
+    register_handler(('-l', '--list'), list_items)
+    register_handler(('-a', '--add'), add)
+    register_handler(('-r', '--remove'), remove)
+    register_handler(('-e', '--edit'), edit)
+    register_handler(('-m', '--move'), move)
+    register_handler(('-org', '--orgfile'), org_file)
+    register_handler(('-v', '--version'), print_version)
 
     # Command line argument parsing.
     if len(sys.argv) <= 1:
         list_items()
 
-    elif sys.argv[1] == '-l' or sys.argv[1] == '--list':
-        list_items()
-
-    elif sys.argv[1] == '-a' or sys.argv[1] == '--add':
-        add()
-
-    elif sys.argv[1] == '-r' or sys.argv[1] == '--remove':
-        remove()
-
-    elif sys.argv[1] == '-e' or sys.argv[1] == '--edit':
-        edit()
-
-    elif sys.argv[1] == "-m" or sys.argv[1] == "--move":
-        move()
-
-    elif sys.argv[1] == '-org' or sys.argv[1] == '--orgfile':
-        orgfile()
-
-    elif sys.argv[1] == '-v' or sys.argv[1] == '--version':
-        print_version()
+    elif len(sys.argv) >= 1:
+        for triggers, handler in handlers.items():
+            if sys.argv[1] in triggers:
+                handler()
 
     else:
         print_usage()
